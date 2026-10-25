@@ -6,7 +6,7 @@ compatibility_date = "2026-10-01"
 [vars]
 # Adresse EXACTE de ton site GitHub Pages (sans barre oblique finale, sans le nom du dépôt).
 # Exemple : https://gourguesnicolas.github.io
-ALLOWED_ORIGIN = "https://VOTRE-NOM.github.io"
+ALLOWED_ORIGIN = "https://gourguesnicolas.github.io"
 
 # La clé API ne va PAS ici. Ajoute-la comme secret :
 #   npx wrangler secret put TWELVE_DATA_API_KEY
