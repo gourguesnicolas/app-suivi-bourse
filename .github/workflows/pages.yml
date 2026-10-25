@@ -1,0 +1,49 @@
+name: Mettre en ligne sur GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Vérifier la configuration
+        env:
+          API_BASE: ${{ vars.API_BASE }}
+        run: |
+          if [ -z "$API_BASE" ]; then
+            echo "::error::La variable API_BASE est absente. Dépôt > Settings > Secrets and variables > Actions > Variables : ajoute API_BASE avec l'adresse de ton Worker (https://cotes-api.xxx.workers.dev)."
+            exit 1
+          fi
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+        env:
+          API_BASE: ${{ vars.API_BASE }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
