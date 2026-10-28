@@ -20,7 +20,7 @@ export interface ApiResult {
   cacheSeconds: number;
 }
 
-const DATASETS: readonly string[] = ['m5', 'm30', 'd1', 'mo1'] satisfies Dataset[];
+const DATASETS: readonly string[] = ['m5', 'm30', 'd1', 'mo1', 'd1a', 'mo1a'] satisfies Dataset[];
 const SYMBOL_RE = /^[A-Z0-9][A-Z0-9.\-/:^_]{0,19}$/;
 const MAX_SYMBOLS = 20;
 
@@ -41,7 +41,14 @@ function parseSymbols(raw: string | null): string[] {
 }
 
 /** Durée de cache de l'historique, par jeu de données (même rythme que le cache du serveur). */
-const SERIES_CACHE_SECONDS: Record<Dataset, number> = { m5: 300, m30: 900, d1: 900, mo1: 6 * 3600 };
+const SERIES_CACHE_SECONDS: Record<Dataset, number> = {
+  m5: 300,
+  m30: 900,
+  d1: 900,
+  mo1: 6 * 3600,
+  d1a: 900,
+  mo1a: 6 * 3600,
+};
 /** Copie de secours, erreur partielle ou rafraîchissement forcé : on ne la garde pas longtemps. */
 const SHORT_CACHE_SECONDS = 30;
 

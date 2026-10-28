@@ -8,7 +8,10 @@ import { typeLabel } from '../format';
 import { SearchIcon } from './Icons';
 
 interface Props {
-  onPick: (symbol: string) => AddResult;
+  onPick: (symbol: string, hit: SearchHit) => AddResult;
+  placeholder?: string;
+  /** Message affiché quand `onPick` répond « full ». */
+  fullMessage?: string;
 }
 
 type Phase = 'idle' | 'loading' | 'error';
@@ -20,7 +23,11 @@ const firstAvailable = (hits: SearchHit[], from = 0, direction = 1): number => {
   return -1;
 };
 
-export default function SymbolSearch({ onPick }: Props) {
+export default function SymbolSearch({
+  onPick,
+  placeholder = 'Rechercher un titre (AAPL, VOO…)',
+  fullMessage = `Ta liste est pleine (${MAX_WATCHLIST} titres). Retire un titre pour en ajouter un autre.`,
+}: Props) {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -72,9 +79,9 @@ export default function SymbolSearch({ onPick }: Props) {
 
   const choose = (hit: SearchHit | undefined) => {
     if (!hit || !hit.available) return;
-    const result = onPick(hit.symbol);
+    const result = onPick(hit.symbol, hit);
     if (result === 'full') {
-      setNote(`Ta liste est pleine (${MAX_WATCHLIST} titres). Retire un titre pour en ajouter un autre.`);
+      setNote(fullMessage);
       return;
     }
     setNote(null);
@@ -115,7 +122,7 @@ export default function SymbolSearch({ onPick }: Props) {
           aria-controls={listId}
           aria-autocomplete="list"
           aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
-          placeholder="Rechercher un titre (AAPL, VOO…)"
+          placeholder={placeholder}
           autoComplete="off"
           spellCheck={false}
           value={query}

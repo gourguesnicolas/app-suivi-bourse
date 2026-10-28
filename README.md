@@ -4,6 +4,7 @@ Application web de suivi boursier : actions, FNB (ETF), forex et crypto, avec l'
 
 - Liste de suivi (jusqu'à 10 titres) mémorisée dans le navigateur, avec recherche de symboles
 - Graphique avec 12 périodes : **1 j, 5 j, 1 m, 3 m, 6 m, CA, 1 a, 3 a, 5 a, 7 a, 10 a, Max** (CA = cumul annuel, depuis le 1er janvier)
+- Onglet **Simulation** : deux portefeuilles côte à côte sur une période choisie, en montant ou en parts (fractions permises), frais de gestion annuels déduits, dividendes réinvestis ou non
 - Survol à la souris ou au clavier (flèches), thèmes clair et sombre, affichage adapté au mobile
 - Ta clé API reste sur le serveur : elle n'est jamais envoyée au navigateur
 - Le serveur compte les crédits et respecte les limites du plan gratuit (8 par minute, 800 par jour)

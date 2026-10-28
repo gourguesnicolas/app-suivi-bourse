@@ -10,8 +10,10 @@
  *  - m30 : barres de 30 minutes (cinq dernières séances)
  *  - d1  : barres quotidiennes (jusqu'à 5 000 jours, soit une vingtaine d'années)
  *  - mo1 : barres mensuelles (tout l'historique disponible)
+ *  - d1a, mo1a : comme d1 et mo1, mais en rendement total (cours ajustés pour les dividendes,
+ *    comme s'ils avaient été réinvestis). Servent à la simulation.
  */
-export type Dataset = 'm5' | 'm30' | 'd1' | 'mo1';
+export type Dataset = 'm5' | 'm30' | 'd1' | 'mo1' | 'd1a' | 'mo1a';
 
 export interface Quote {
   symbol: string;

@@ -16,12 +16,12 @@ interface Props {
   revealKey: string;
 }
 
-const MARGIN = { top: 14, right: 66, bottom: 28, left: 6 };
+export const MARGIN = { top: 14, right: 66, bottom: 28, left: 6 };
 const DAY = 86_400;
 
-const clamp = (n: number, min: number, max: number) => Math.min(Math.max(n, min), max);
+export const clamp = (n: number, min: number, max: number) => Math.min(Math.max(n, min), max);
 
-function niceTicks(min: number, max: number, wanted: number): number[] {
+export function niceTicks(min: number, max: number, wanted: number): number[] {
   const span = max - min || Math.abs(max) * 0.02 || 1;
   const raw = span / Math.max(wanted, 1);
   const magnitude = 10 ** Math.floor(Math.log10(raw));
@@ -65,7 +65,7 @@ function pickUnit(kind: SliceKind, spanDays: number): { unit: Unit; style: DateS
  * Repères de l'axe horizontal posés sur des débuts de période (heures rondes, lundis, 1er du mois,
  * 1er janvier) plutôt qu'à intervalles arbitraires, puis espacés pour tenir dans la largeur.
  */
-function buildXTicks(points: ChartPoint[], kind: SliceKind, count: number, x: (i: number) => number) {
+export function buildXTicks(points: ChartPoint[], kind: SliceKind, count: number, x: (i: number) => number) {
   const first = points[0];
   const last = points[points.length - 1];
   if (!first || !last || points.length < 2) return [];

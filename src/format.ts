@@ -53,6 +53,25 @@ export function fmtPercent(value: number | null | undefined, signed = true): str
   }).format(value / 100);
 }
 
+/** Montant dans la devise du titre (« 10 000,00 $ US »). */
+export function fmtMoney(value: number | null | undefined, currency: string, compact = false): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  const options: Intl.NumberFormatOptions = compact
+    ? { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }
+    : { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  try {
+    return numberFormat(options).format(value);
+  } catch {
+    // Code de devise inconnu d'Intl : on affiche le nombre suivi du code.
+    return `${numberFormat({ maximumFractionDigits: compact ? 1 : 2, notation: compact ? 'compact' : 'standard' }).format(value)} ${currency}`;
+  }
+}
+
+/** Nombre de parts : jusqu'à 4 décimales, sans zéros inutiles. */
+export function fmtShares(value: number): string {
+  return numberFormat({ maximumFractionDigits: 4 }).format(value);
+}
+
 export function fmtVolume(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—';
   return numberFormat({ notation: 'compact', maximumFractionDigits: 1 }).format(value);

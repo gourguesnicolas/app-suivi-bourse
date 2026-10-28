@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ApiErrorInfo, Dataset, Quote, SeriesResponse, StatusResponse } from '../shared/types';
 import { ApiClientError, api } from './api';
 
@@ -242,6 +242,92 @@ export function useSeries(symbol: string | null, dataset: Dataset) {
   }, [symbol, dataset]);
 
   return { ...state, retry };
+}
+
+const pause = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer);
+      resolve();
+    }, { once: true });
+  });
+
+/**
+ * Charge l'historique de plusieurs titres, un à la fois pour ménager la limite par minute.
+ * Quand elle est atteinte, on attend le délai indiqué par le serveur puis on reprend.
+ * Les résultats sont indexés par symbole et ne contiennent que ceux du jeu de données demandé.
+ */
+export function useSeriesSet(symbols: string[], dataset: Dataset) {
+  const key = [...new Set(symbols)].sort().join(',');
+  const [loaded, setLoaded] = useState<Record<string, SeriesResponse>>({});
+  const [failed, setFailed] = useState<Record<string, ApiClientError>>({});
+  const [waiting, setWaiting] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!key) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    void (async () => {
+      for (const symbol of key.split(',')) {
+        const id = `${symbol}:${dataset}`;
+        const cached = seriesCache.get(id);
+        if (cached) {
+          setLoaded((all) => (all[id] === cached.data ? all : { ...all, [id]: cached.data }));
+          continue;
+        }
+        for (let tries = 0; ; tries++) {
+          try {
+            const data = await api.series(symbol, dataset, false, signal);
+            seriesCache.set(id, { data, at: Date.now() });
+            setLoaded((all) => ({ ...all, [id]: data }));
+            break;
+          } catch (err) {
+            if (signal.aborted) return;
+            const apiError = err as ApiClientError;
+            if (apiError.code === 'rate_limited' && tries < 4) {
+              setWaiting(true);
+              await pause(Math.max(apiError.retryAfter ?? 15, 5) * 1000, signal);
+              setWaiting(false);
+              if (signal.aborted) return;
+              continue;
+            }
+            setFailed((all) => ({ ...all, [id]: apiError }));
+            break;
+          }
+        }
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      setWaiting(false);
+    };
+  }, [key, dataset, attempt]);
+
+  const { data, errors, pending } = useMemo(() => {
+    const data: Record<string, SeriesResponse> = {};
+    const errors: Record<string, ApiClientError> = {};
+    const pending: string[] = [];
+    for (const symbol of key ? key.split(',') : []) {
+      const id = `${symbol}:${dataset}`;
+      const hit = loaded[id];
+      const error = failed[id];
+      if (hit) data[symbol] = hit;
+      else if (error) errors[symbol] = error;
+      else pending.push(symbol);
+    }
+    return { data, errors, pending };
+  }, [key, dataset, loaded, failed]);
+
+  const retry = useCallback(() => {
+    setFailed({});
+    setAttempt((n) => n + 1);
+  }, []);
+
+  return { data, errors, pending, waiting, retry };
 }
 
 export function useStatus(refreshToken: unknown) {

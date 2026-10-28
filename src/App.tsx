@@ -3,6 +3,7 @@ import { BrandMark, MoonIcon, RefreshIcon, SunIcon } from './components/Icons';
 import ChartPanel from './components/ChartPanel';
 import Notice from './components/Notice';
 import QuoteHeader from './components/QuoteHeader';
+import Simulator from './components/Simulator';
 import StatsPanel from './components/StatsPanel';
 import SymbolSearch from './components/SymbolSearch';
 import Watchlist from './components/Watchlist';
@@ -13,11 +14,19 @@ import type { PeriodId } from './periods';
 
 const anyString = (value: string): value is string => value.length > 0;
 
+type View = 'quotes' | 'sim';
+const isView = (value: string): value is View => value === 'quotes' || value === 'sim';
+const VIEWS: { id: View; label: string }[] = [
+  { id: 'quotes', label: 'Cotes' },
+  { id: 'sim', label: 'Simulation' },
+];
+
 export default function App() {
   const [theme, toggleTheme] = useTheme();
   const { symbols, add, remove } = useWatchlist();
   const [storedSymbol, setStoredSymbol] = usePersisted<string>('cotes.selected', symbols[0] ?? '', anyString);
   const [period, setPeriod] = usePersisted<PeriodId>('cotes.period', '1m', isPeriodId);
+  const [view, setView] = usePersisted<View>('cotes.view', 'quotes', isView);
 
   // Si le titre mémorisé a été retiré de la liste, on retombe sur le premier.
   const selected = symbols.includes(storedSymbol) ? storedSymbol : (symbols[0] ?? null);
@@ -39,12 +48,18 @@ export default function App() {
   const isDemo = status?.mode === 'demo';
 
   useEffect(() => {
-    document.title = selected && quote ? `${selected} ${fmtPrice(quote.price)} — Cotes` : 'Cotes — suivi boursier';
-  }, [selected, quote]);
+    if (view === 'sim') document.title = 'Simulation — Cotes';
+    else document.title = selected && quote ? `${selected} ${fmtPrice(quote.price)} — Cotes` : 'Cotes — suivi boursier';
+  }, [view, selected, quote]);
+
+  const show = (symbol: string) => {
+    setStoredSymbol(symbol);
+    setView('quotes');
+  };
 
   const pick = (symbol: string) => {
     const result = add(symbol);
-    if (result !== 'full') setStoredSymbol(symbol.toUpperCase());
+    if (result !== 'full') show(symbol.toUpperCase());
     return result;
   };
 
@@ -70,6 +85,20 @@ export default function App() {
           </button>
         </header>
 
+        <nav className="views" aria-label="Sections">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              className="view-tab"
+              aria-current={view === v.id ? 'page' : undefined}
+              onClick={() => setView(v.id)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </nav>
+
         <SymbolSearch onPick={pick} />
 
         <div className="list-head">
@@ -92,9 +121,9 @@ export default function App() {
           symbols={symbols}
           quotes={quotes.quotes}
           errors={quotes.errors}
-          selected={selected}
+          selected={view === 'quotes' ? selected : null}
           loading={quotes.loading}
-          onSelect={setStoredSymbol}
+          onSelect={show}
           onRemove={remove}
         />
 
@@ -129,37 +158,42 @@ export default function App() {
             Mode démo : les cours affichés sont fictifs. Ajoute ta clé dans le fichier <code>.env</code> (voir <code>.env.example</code>) pour voir les vrais cours.
           </Notice>
         )}
-        {quotes.error && (
-          <Notice tone="error" action={{ label: 'Réessayer', onClick: () => void quotes.refresh() }}>
-            {quotes.error.message}
-          </Notice>
-        )}
-
-        {selected ? (
+        {view === 'sim' ? (
+          <Simulator />
+        ) : (
           <>
-            <QuoteHeader symbol={selected} quote={quote} loading={quotes.loading} errorMessage={quoteError} />
-            <ChartPanel
-              symbol={selected}
-              period={period}
-              onPeriod={setPeriod}
-              slice={slice}
-              loading={chartLoading}
-              error={series.error}
-              onRetry={series.retry}
-            />
-            {quote && <StatsPanel quote={quote} />}
-            {data?.stale && (
-              <p className="stale-note">
-                Twelve Data ne répond pas : ce graphique vient de la dernière copie enregistrée (
-                {new Date(data.fetchedAt).toLocaleTimeString('fr-CA', { hour: 'numeric', minute: '2-digit' })}).
-              </p>
+            {quotes.error && (
+              <Notice tone="error" action={{ label: 'Réessayer', onClick: () => void quotes.refresh() }}>
+                {quotes.error.message}
+              </Notice>
+            )}
+            {selected ? (
+              <>
+                <QuoteHeader symbol={selected} quote={quote} loading={quotes.loading} errorMessage={quoteError} />
+                <ChartPanel
+                  symbol={selected}
+                  period={period}
+                  onPeriod={setPeriod}
+                  slice={slice}
+                  loading={chartLoading}
+                  error={series.error}
+                  onRetry={series.retry}
+                />
+                {quote && <StatsPanel quote={quote} />}
+                {data?.stale && (
+                  <p className="stale-note">
+                    Twelve Data ne répond pas : ce graphique vient de la dernière copie enregistrée (
+                    {new Date(data.fetchedAt).toLocaleTimeString('fr-CA', { hour: 'numeric', minute: '2-digit' })}).
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="empty">
+                <h1>Aucun titre suivi</h1>
+                <p>Cherche un symbole dans la barre de gauche, par exemple AAPL pour Apple ou VOO pour un FNB qui suit le S&amp;P 500.</p>
+              </div>
             )}
           </>
-        ) : (
-          <div className="empty">
-            <h1>Aucun titre suivi</h1>
-            <p>Cherche un symbole dans la barre de gauche, par exemple AAPL pour Apple ou VOO pour un FNB qui suit le S&amp;P 500.</p>
-          </div>
         )}
       </main>
     </div>

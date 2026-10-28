@@ -24,11 +24,15 @@ const quoteLock = new Mutex();
 
 export const credits = () => getLimiter().snapshot();
 
-const SPECS: Record<Dataset, { interval: string; size: number; ttlMs: number }> = {
+// `adjust` : par défaut, Twelve Data ajuste les cours pour les fractionnements seulement.
+// « all » les ajuste aussi pour les dividendes (rendement total).
+const SPECS: Record<Dataset, { interval: string; size: number; ttlMs: number; adjust?: string }> = {
   m5: { interval: '5min', size: 120, ttlMs: 5 * 60_000 },
   m30: { interval: '30min', size: 150, ttlMs: 15 * 60_000 },
   d1: { interval: '1day', size: 5000, ttlMs: 15 * 60_000 },
   mo1: { interval: '1month', size: 5000, ttlMs: 6 * 3_600_000 },
+  d1a: { interval: '1day', size: 5000, ttlMs: 15 * 60_000, adjust: 'all' },
+  mo1a: { interval: '1month', size: 5000, ttlMs: 6 * 3_600_000, adjust: 'all' },
 };
 
 const num = (value: unknown): number | null => {
@@ -231,7 +235,7 @@ export async function getSeries(symbol: string, dataset: Dataset, force: boolean
     async () => {
       const data = await call(
         'time_series',
-        { symbol, interval: spec.interval, outputsize: String(spec.size) },
+        { symbol, interval: spec.interval, outputsize: String(spec.size), ...(spec.adjust ? { adjust: spec.adjust } : {}) },
         1,
       );
       return parseSeries(symbol, dataset, data);

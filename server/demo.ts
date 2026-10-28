@@ -296,10 +296,16 @@ export async function getSeries(symbol: string, dataset: Dataset, _force: boolea
       }
       return out;
     });
-  } else if (dataset === 'd1') {
+  } else if (dataset === 'd1' || dataset === 'd1a') {
     points = daily.slice(-2800).map((d) => ({ t: d.date, c: d.close }));
   } else {
     points = monthly(daily);
+  }
+  if (dataset === 'd1a' || dataset === 'mo1a') {
+    // Rendement total fictif : environ 1,5 % de dividendes par an, réinvestis.
+    const last = points[points.length - 1];
+    const end = last ? Date.parse(last.t.slice(0, 10)) : 0;
+    points = points.map((p) => ({ t: p.t, c: p.c * 1.015 ** ((Date.parse(p.t.slice(0, 10)) - end) / (365.25 * 86_400_000)) }));
   }
 
   return {
