@@ -13,6 +13,11 @@ export interface ApiResult {
   status: number;
   body: unknown;
   headers: Record<string, string>;
+  /**
+   * Durée (en secondes) pendant laquelle la réponse peut être resservie telle quelle.
+   * Le Worker s'en sert pour le cache de Cloudflare, partagé entre toutes ses instances.
+   */
+  cacheSeconds: number;
 }
 
 const DATASETS: readonly string[] = ['m5', 'm30', 'd1', 'mo1'] satisfies Dataset[];
@@ -35,25 +40,38 @@ function parseSymbols(raw: string | null): string[] {
   return list;
 }
 
-async function route(url: URL): Promise<unknown> {
+/** Durée de cache de l'historique, par jeu de données (même rythme que le cache du serveur). */
+const SERIES_CACHE_SECONDS: Record<Dataset, number> = { m5: 300, m30: 900, d1: 900, mo1: 6 * 3600 };
+/** Copie de secours, erreur partielle ou rafraîchissement forcé : on ne la garde pas longtemps. */
+const SHORT_CACHE_SECONDS = 30;
+
+async function route(url: URL): Promise<{ body: unknown; cacheSeconds: number }> {
   const params = url.searchParams;
   const p = provider();
+  const force = params.get('force') === '1';
   switch (url.pathname) {
     case '/api/status': {
       const status: StatusResponse = { mode: settings.demo ? 'demo' : 'live', credits: p.credits() };
-      return status;
+      return { body: status, cacheSeconds: 0 };
     }
     case '/api/search': {
       const q = (params.get('q') ?? '').trim();
       if (q.length < 1 || q.length > 40) throw new ApiHttpError(400, 'bad_request', 'Recherche invalide.');
-      return { hits: await p.searchSymbols(q) };
+      return { body: { hits: await p.searchSymbols(q) }, cacheSeconds: 24 * 3600 };
     }
-    case '/api/quotes':
-      return p.getQuotes(parseSymbols(params.get('symbols')), params.get('force') === '1');
+    case '/api/quotes': {
+      const res = await p.getQuotes(parseSymbols(params.get('symbols')), force);
+      const open = res.quotes.some((q) => q.isMarketOpen);
+      const ttl = open ? settings.quoteTtlOpenMs : settings.quoteTtlClosedMs;
+      const partial = Object.keys(res.errors).length > 0;
+      return { body: res, cacheSeconds: force || partial ? SHORT_CACHE_SECONDS : Math.round(ttl / 1000) };
+    }
     case '/api/series': {
       const dataset = params.get('dataset') ?? '';
       if (!DATASETS.includes(dataset)) throw new ApiHttpError(400, 'bad_request', 'Jeu de données invalide.');
-      return p.getSeries(parseSymbol(params.get('symbol')), dataset as Dataset, params.get('force') === '1');
+      const res = await p.getSeries(parseSymbol(params.get('symbol')), dataset as Dataset, force);
+      const ttl = force || res.stale ? SHORT_CACHE_SECONDS : SERIES_CACHE_SECONDS[dataset as Dataset];
+      return { body: res, cacheSeconds: ttl };
     }
     default:
       throw new ApiHttpError(404, 'not_found', 'Route inconnue.');
@@ -62,7 +80,8 @@ async function route(url: URL): Promise<unknown> {
 
 export async function handleApi(url: URL): Promise<ApiResult> {
   try {
-    return { status: 200, body: await route(url), headers: {} };
+    const { body, cacheSeconds } = await route(url);
+    return { status: 200, body, headers: {}, cacheSeconds };
   } catch (err) {
     const apiError = asApiError(err);
     if (apiError.code === 'internal') console.error(err);
@@ -72,6 +91,6 @@ export async function handleApi(url: URL): Promise<ApiResult> {
       body.retryAfter = apiError.retryAfter;
       headers['retry-after'] = String(apiError.retryAfter);
     }
-    return { status: apiError.status, body, headers };
+    return { status: apiError.status, body, headers, cacheSeconds: 0 };
   }
 }

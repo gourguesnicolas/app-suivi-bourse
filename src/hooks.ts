@@ -194,6 +194,11 @@ const SERIES_FRESH_MS = 60_000;
 export function useSeries(symbol: string | null, dataset: Dataset) {
   const [state, setState] = useState<SeriesState>({ data: null, loading: false, error: null });
   const [attempt, setAttempt] = useState(0);
+  const autoRetries = useRef(0);
+
+  useEffect(() => {
+    autoRetries.current = 0;
+  }, [symbol, dataset]);
 
   useEffect(() => {
     if (!symbol) {
@@ -206,9 +211,11 @@ export function useSeries(symbol: string | null, dataset: Dataset) {
     if (cached && Date.now() - cached.at < SERIES_FRESH_MS) return;
 
     const controller = new AbortController();
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     api
       .series(symbol, dataset, false, controller.signal)
       .then((data) => {
+        autoRetries.current = 0;
         seriesCache.set(key, { data, at: Date.now() });
         setState({ data, loading: false, error: null });
       })
@@ -216,8 +223,17 @@ export function useSeries(symbol: string | null, dataset: Dataset) {
         if (controller.signal.aborted) return;
         // Si on a déjà une copie à afficher, on la garde plutôt que de montrer une erreur.
         setState((s) => ({ data: s.data, loading: false, error: s.data ? null : (err as ApiClientError) }));
+        // Limite par minute : on réessaie seul dès que le serveur l'estime possible.
+        const apiError = err as ApiClientError;
+        if (apiError.code === 'rate_limited' && autoRetries.current < 3) {
+          autoRetries.current += 1;
+          retryTimer = setTimeout(() => setAttempt((n) => n + 1), Math.max(apiError.retryAfter ?? 15, 5) * 1000);
+        }
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      clearTimeout(retryTimer);
+    };
   }, [symbol, dataset, attempt]);
 
   const retry = useCallback(() => {

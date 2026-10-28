@@ -60,6 +60,13 @@ export default {
 
     configure({ ...env });
     const result = await handleApi(url);
-    return json(result.status, result.body, { ...cors, ...result.headers });
+    // Les instances du Worker ne partagent pas leur mémoire : sans le cache de Cloudflare
+    // (voir [cache] dans wrangler.toml), chaque nouvelle instance redépenserait des crédits.
+    // max-age=0 : le navigateur redemande toujours; s-maxage : Cloudflare répond à sa place.
+    const caching: Record<string, string> =
+      result.status === 200 && result.cacheSeconds > 0
+        ? { 'cache-control': `public, max-age=0, s-maxage=${result.cacheSeconds}` }
+        : {};
+    return json(result.status, result.body, { ...cors, ...result.headers, ...caching });
   },
 };

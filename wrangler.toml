@@ -3,6 +3,13 @@ name = "cotes-api"
 main = "worker/index.ts"
 compatibility_date = "2026-10-01"
 
+# Cache de Cloudflare devant le Worker : une cote ou un historique déjà chargé est resservi
+# sans relancer le Worker, donc sans dépenser de crédits Twelve Data. La durée de chaque
+# réponse est fixée par son en-tête Cache-Control (voir worker/index.ts).
+[cache]
+enabled = true
+cross_version_cache = true
+
 [vars]
 # Adresse EXACTE de ton site GitHub Pages (sans barre oblique finale, sans le nom du dépôt).
 # Exemple : https://gourguesnicolas.github.io
